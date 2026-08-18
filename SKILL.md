@@ -74,8 +74,8 @@ curl -s -H "Authorization: Bearer $(cat /tmp/working_api_key.txt)" \
 ### 第二步：一键安装代理服务
 
 ```bash
-# 设置代理端口（默认 9000）
-export PROXY_PORT=9000
+# 设置代理端口（默认 9997）
+export PROXY_PORT=9997
 
 # 如果已有上游 API Key
 export UPSTREAM_API_KEY="你的tokenhub_key"
@@ -105,8 +105,8 @@ bash scripts/setup.sh
 
 | 字段 | 值 |
 |------|-----|
-| Service | `http://localhost:9000` |
-| Public hostname | `你的域名`（如 `glm.yourdomain.com`） |
+| Service | `http://localhost:9997` |
+| Public hostname | `glm.zeroo.ggff.net`（如 `glm.zeroo.ggff.net`） |
 | Path | 留空 |
 
 **3.3 启动隧道：**
@@ -137,32 +137,32 @@ CF_TUNNEL_TOKEN="eyJxxx你的tunnel_token" bash scripts/setup.sh
 
 ```bash
 # 1. 健康检查
-curl http://localhost:9000/health
+curl http://localhost:9997/health
 
 # 2. 模型列表
 curl -H "Authorization: Bearer $(cat /tmp/proxy_api_key.txt)" \
-  http://localhost:9000/v1/models
+  http://localhost:9997/v1/models
 
 # 3. 普通对话
-curl -X POST http://localhost:9000/v1/chat/completions \
+curl -X POST http://localhost:9997/v1/chat/completions \
   -H "Authorization: Bearer $(cat /tmp/proxy_api_key.txt)" \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"你好"}]}'
 
 # 4. Thinking 模式（xhigh 推理强度）
-curl -X POST http://localhost:9000/v1/chat/completions \
+curl -X POST http://localhost:9997/v1/chat/completions \
   -H "Authorization: Bearer $(cat /tmp/proxy_api_key.txt)" \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"证明根号2是无理数"}],"reasoning_effort":"xhigh"}'
 
 # 5. 流式响应
-curl -X POST http://localhost:9000/v1/chat/completions \
+curl -X POST http://localhost:9997/v1/chat/completions \
   -H "Authorization: Bearer $(cat /tmp/proxy_api_key.txt)" \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"你好"}],"stream":true}'
 
-# 6. 公网访问（替换为你的域名）
-curl -X POST https://glm.yourdomain.com/v1/chat/completions \
+# 6. 公网访问（替换为glm.zeroo.ggff.net）
+curl -X POST https://glm.zeroo.ggff.net/v1/chat/completions \
   -H "Authorization: Bearer $(cat /tmp/proxy_api_key.txt)" \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"你好"}]}'
@@ -177,7 +177,7 @@ from openai import OpenAI
 
 client = OpenAI(
     api_key="你的代理API_KEY",  # /tmp/proxy_api_key.txt 中的值
-    base_url="https://glm.yourdomain.com/v1"
+    base_url="https://glm.zeroo.ggff.net/v1"
 )
 
 # 普通对话
@@ -201,14 +201,14 @@ print(response.choices[0].message.reasoning_content)  # 推理过程
 
 ```bash
 # 查看状态
-curl http://localhost:9000/health
+curl http://localhost:9997/health
 
 # 查看日志
 tail -f /tmp/glm_proxy.log
 
 # 重启代理
 kill $(cat /tmp/glm_proxy.pid)
-PROXY_PORT=9000 nohup python3 /root/glm-proxy/glm_proxy.py > /tmp/glm_proxy.log 2>&1 &
+PROXY_PORT=9997 nohup python3 /root/glm-proxy/glm_proxy.py > /tmp/glm_proxy.log 2>&1 &
 echo $! > /tmp/glm_proxy.pid
 
 # 重启隧道
@@ -224,7 +224,7 @@ kill $(cat /tmp/glm_proxy.pid) $(cat /tmp/cloudflared.pid) 2>/dev/null
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `PROXY_PORT` | 9000 | 代理监听端口 |
+| `PROXY_PORT` | 9997 | 代理监听端口 |
 | `PROXY_HOST` | 0.0.0.0 | 监听地址 |
 | `TIMEOUT_XHIGH` | 600 | xhigh 超时（秒） |
 | `TIMEOUT_MAX` | 600 | max 超时（秒） |
@@ -240,7 +240,7 @@ kill $(cat /tmp/glm_proxy.pid) $(cat /tmp/cloudflared.pid) 2>/dev/null
 ## 技术架构
 
 ```
-外部电脑 → HTTPS → Cloudflare Tunnel → 代理服务(localhost:9000) → tokenhub API → GLM 推理集群
+外部电脑 → HTTPS → Cloudflare Tunnel → 代理服务(localhost:9997) → tokenhub API → GLM 推理集群
 ```
 
 **代理服务核心功能：**

@@ -10,7 +10,7 @@ from openai import OpenAI
 # 配置（替换为你的实际值）
 # ============================================================
 API_KEY = "你的代理API_KEY"           # /tmp/proxy_api_key.txt 的内容
-BASE_URL = "https://glm.yourdomain.com/v1"  # 你的公网地址
+BASE_URL = "https://glm.zeroo.ggff.net/v1"  # 你的公网地址
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 

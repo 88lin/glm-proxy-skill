@@ -10,10 +10,10 @@
 请帮我搭建 GLM API 中转代理服务：
 
 1. 从 hwcloud 进程内存提取 tokenhub API Key，保存到 /tmp/working_api_key.txt
-2. 运行 bash scripts/setup.sh 安装代理服务（端口 9000）
+2. 运行 bash scripts/setup.sh 安装代理服务（端口 9997）
 3. 配置 Cloudflare Tunnel：
    - Tunnel Token: eyJxxx（替换为你的 token）
-   - Ingress: http://localhost:9000 → glm.你的域名.com
+   - Ingress: http://localhost:9997 → glm.zeroo.ggff.net
 4. 启动隧道并验证公网访问
 5. 输出最终的 API Base URL 和 API Key
 
@@ -69,7 +69,7 @@ echo '你的KEY' > /tmp/working_api_key.txt
 bash scripts/setup.sh
 
 # 或指定端口和上游 Key
-UPSTREAM_API_KEY="你的KEY" PROXY_PORT=9000 bash scripts/setup.sh
+UPSTREAM_API_KEY="你的KEY" PROXY_PORT=9997 bash scripts/setup.sh
 ```
 
 安装完成后，代理 API Key 在 `/tmp/proxy_api_key.txt`。
@@ -80,8 +80,8 @@ UPSTREAM_API_KEY="你的KEY" PROXY_PORT=9000 bash scripts/setup.sh
 2. Networks → Tunnels → Create a tunnel
 3. 复制 Tunnel Token（`eyJxxx...` 格式）
 4. 配置 Ingress Rule：
-   - Service: `http://localhost:9000`
-   - Public hostname: `glm.你的域名.com`
+   - Service: `http://localhost:9997`
+   - Public hostname: `glm.zeroo.ggff.net`
 
 ```bash
 # 安装 cloudflared
@@ -99,15 +99,15 @@ echo $! > /tmp/cloudflared.pid
 
 ```bash
 # 本地验证
-curl http://localhost:9000/health
+curl http://localhost:9997/health
 
-curl -X POST http://localhost:9000/v1/chat/completions \
+curl -X POST http://localhost:9997/v1/chat/completions \
   -H "Authorization: Bearer $(cat /tmp/proxy_api_key.txt)" \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"你好"}]}'
 
 # 公网验证（替换域名）
-curl -X POST https://glm.你的域名.com/v1/chat/completions \
+curl -X POST https://glm.zeroo.ggff.net/v1/chat/completions \
   -H "Authorization: Bearer $(cat /tmp/proxy_api_key.txt)" \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"你好"}]}'
@@ -122,7 +122,7 @@ from openai import OpenAI
 
 client = OpenAI(
     api_key="你的代理API_KEY",       # /tmp/proxy_api_key.txt 的内容
-    base_url="https://glm.你的域名.com/v1"
+    base_url="https://glm.zeroo.ggff.net/v1"
 )
 
 # 普通对话
@@ -156,19 +156,19 @@ for chunk in client.chat.completions.create(
 
 ```bash
 # 普通对话
-curl -X POST https://glm.你的域名.com/v1/chat/completions \
+curl -X POST https://glm.zeroo.ggff.net/v1/chat/completions \
   -H "Authorization: Bearer 你的API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"你好"}]}'
 
 # Thinking 模式
-curl -X POST https://glm.你的域名.com/v1/chat/completions \
+curl -X POST https://glm.zeroo.ggff.net/v1/chat/completions \
   -H "Authorization: Bearer 你的API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"证明根号2是无理数"}],"reasoning_effort":"xhigh"}'
 
 # 流式
-curl -X POST https://glm.你的域名.com/v1/chat/completions \
+curl -X POST https://glm.zeroo.ggff.net/v1/chat/completions \
   -H "Authorization: Bearer 你的API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"你好"}],"stream":true}'
@@ -178,7 +178,7 @@ curl -X POST https://glm.你的域名.com/v1/chat/completions \
 
 | 设置项 | 值 |
 |--------|-----|
-| API 地址 | `https://glm.你的域名.com` |
+| API 地址 | `https://glm.zeroo.ggff.net` |
 | API Key | `/tmp/proxy_api_key.txt` 的内容 |
 | 模型 | `glm-5.2` 或 `glm-5.1` |
 
@@ -186,14 +186,14 @@ curl -X POST https://glm.你的域名.com/v1/chat/completions \
 
 ```bash
 # 查看状态
-curl http://localhost:9000/health | python3 -m json.tool
+curl http://localhost:9997/health | python3 -m json.tool
 
 # 查看日志
 tail -f /tmp/glm_proxy.log
 
 # 重启代理
 kill $(cat /tmp/glm_proxy.pid); sleep 1
-PROXY_PORT=9000 nohup python3 /root/glm-proxy/glm_proxy.py > /tmp/glm_proxy.log 2>&1 &
+PROXY_PORT=9997 nohup python3 /root/glm-proxy/glm_proxy.py > /tmp/glm_proxy.log 2>&1 &
 echo $! > /tmp/glm_proxy.pid
 
 # 重启隧道
@@ -235,5 +235,5 @@ glm-proxy-skill/
 1. **上游 API Key 需在华为云环境内提取** — tokenhub 仅内网可访问
 2. **环境重启后需重新提取 Key** — Key 可能会过期
 3. **Cloudflare 免费版有 100s 边缘超时** — 代理已通过空白保活解决此问题
-4. **代理端口需与 Tunnel Ingress 一致** — 默认 9000
+4. **代理端口需与 Tunnel Ingress 一致** — 默认 9997
 5. **GitHub 镜像 `ghfast.top`** — 用于在中国加速下载 cloudflared

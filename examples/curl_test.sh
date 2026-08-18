@@ -1,9 +1,9 @@
 #!/bin/bash
 # GLM API 代理服务 — cURL 测试脚本
 # 用法: bash curl_test.sh [公网域名]
-# 示例: bash curl_test.sh glm.yourdomain.com
+# 示例: bash curl_test.sh glm.zeroo.ggff.net
 
-BASE_URL="${1:-http://localhost:9000}"
+BASE_URL="${1:-http://localhost:9997}"
 API_KEY=$(cat /tmp/proxy_api_key.txt 2>/dev/null || echo "YOUR_API_KEY")
 
 echo "测试地址: $BASE_URL"

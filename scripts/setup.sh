@@ -21,7 +21,7 @@ step()  { echo -e "${BLUE}[STEP]${NC} $1"; }
 GITHUB_MIRROR="https://ghfast.top"
 
 # 默认配置
-PROXY_PORT="${PROXY_PORT:-9000}"
+PROXY_PORT="${PROXY_PORT:-9997}"
 INSTALL_DIR="${INSTALL_DIR:-/root/glm-proxy}"
 UPSTREAM_API_KEY="${UPSTREAM_API_KEY:-}"
 CF_TUNNEL_TOKEN="${CF_TUNNEL_TOKEN:-}"

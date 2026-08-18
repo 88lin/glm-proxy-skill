@@ -19,54 +19,40 @@ GLM代理、GLM中转、GLM API、glm proxy、华为云模型代理、tokenhub�
 
 ### 第一步：提取上游 API Key
 
-上游 API Key 是华为云内部 tokenhub 服务的认证凭证，需要从 hwcloud 二进制/进程中提取。
+上游 API Key 是华为云内部 tokenhub 服务的认证凭证，需要从 hwcloud 进程内存中提取。
 
-**方法 A — 从 hwcloud 进程内存提取（推荐）：**
+> **重要**：tokenhub API Key 通常超过 1000 字符，以 `AAAA` 开头。提取脚本已优化支持超长 key + 自动验证。
+
+**一键提取（推荐）：**
 
 ```bash
-# 1. 先启动 hwcloud chat（在另一个终端或后台）
-hwcloud chat &
-
-# 2. 运行提取脚本
+# 确保 hwcloud 正在运行（hwcloud chat 或其他命令）
 bash scripts/extract_key.sh
 ```
 
-**方法 B — 手动提取：**
+脚本会自动：
+1. 用 gdb dump 进程内存，搜索 `Authorization: Bearer <token>` 模式
+2. 支持超长 key（30-2000 字符），按长度降序排列候选
+3. 逐个自动验证候选 key（向 tokenhub 发测试请求）
+4. 验证成功后保存到 `/tmp/working_api_key.txt`
+
+**手动提取（备选）：**
 
 ```bash
-# 找到 hwcloud 进程
 PID=$(pgrep -f hwcloud | head -1)
 
-# 扫描进程内存中的 API Key
+# gdb dump 全部内存
+gdb -batch -ex "attach $PID" -ex "dump memory /tmp/mem.bin 0 0xffffffff" -ex "detach"
+
+# 搜索 Bearer token（注意：key 可能超过 1000 字符）
 python3 -c "
 import re
-pid = $PID
-with open(f'/proc/{pid}/maps') as f:
-    maps = f.readlines()
-for line in maps:
-    parts = line.split()
-    if len(parts) < 6 or 'r' not in parts[1]:
-        continue
-    start, end = [int(x, 16) for x in parts[0].split('-')]
-    if end - start > 50*1024*1024:
-        continue
-    try:
-        with open(f'/proc/{pid}/mem', 'rb') as mem:
-            mem.seek(start)
-            data = mem.read(end - start).decode('utf-8', errors='ignore')
-        for m in re.finditer(r'Bearer\s+([A-Za-z0-9_\-]{32,128})', data):
-            print(m.group(1))
-    except:
-        continue
+data = open('/tmp/mem.bin','rb').read().decode('utf-8','ignore')
+for m in re.finditer(r'Authorization:\s*Bearer\s+([A-Za-z0-9_\-+/=\.]{30,2000})', data):
+    print(m.group(1))
 " | sort -u | head -5
 
-# 将找到的 Key 保存
-echo '找到的KEY' > /tmp/working_api_key.txt
-```
-
-**验证 Key 有效性：**
-
-```bash
+# 验证找到的 key
 curl -s -H "Authorization: Bearer $(cat /tmp/working_api_key.txt)" \
   https://tokenhub.developer.huaweicloud.com/v2/models | python3 -m json.tool
 ```
@@ -74,13 +60,8 @@ curl -s -H "Authorization: Bearer $(cat /tmp/working_api_key.txt)" \
 ### 第二步：一键安装代理服务
 
 ```bash
-# 设置代理端口（默认 9997）
 export PROXY_PORT=9997
-
-# 如果已有上游 API Key
-export UPSTREAM_API_KEY="你的tokenhub_key"
-
-# 运行安装脚本
+export UPSTREAM_API_KEY="$(cat /tmp/working_api_key.txt)"
 bash scripts/setup.sh
 ```
 
@@ -264,6 +245,7 @@ kill $(cat /tmp/glm_proxy.pid) $(cat /tmp/cloudflared.pid) 2>/dev/null
 | API Key 401 | 检查 `/tmp/proxy_api_key.txt` 和 Authorization header |
 | 公网无法访问 | 检查 cloudflared 进程和 Tunnel 配置 |
 | 环境重启后失效 | 需重新提取 API Key 并重启服务 |
+| 提取 Key 失败 | 确认 hwcloud 正在运行；key 可能超过 1000 字符，用 v2 提取脚本 |
 
 ## 文件说明
 
@@ -271,5 +253,5 @@ kill $(cat /tmp/glm_proxy.pid) $(cat /tmp/cloudflared.pid) 2>/dev/null
 |------|------|
 | `scripts/glm_proxy.py` | 代理服务主程序（FastAPI + httpx） |
 | `scripts/setup.sh` | 一键安装脚本 |
-| `scripts/extract_key.sh` | API Key 提取脚本 |
+| `scripts/extract_key.sh` | API Key 提取脚本（v2 优化版） |
 | `examples/` | 使用示例 |

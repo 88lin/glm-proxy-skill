@@ -1,34 +1,27 @@
 #!/bin/bash
 # ============================================================
-# GLM API 代理服务 — 一键安装脚本
+# GLM API 代理服务 — 一键安装脚本 v2.2
+# 优化：跳过已安装依赖、支持固定 API Key、加速部署
 # 用法: bash setup.sh
 # ============================================================
 set -euo pipefail
 
-# 颜色输出
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; }
 step()  { echo -e "${BLUE}[STEP]${NC} $1"; }
 
-# GitHub 镜像（中国加速）
 GITHUB_MIRROR="https://ghfast.top"
-
-# 默认配置
 PROXY_PORT="${PROXY_PORT:-9997}"
 INSTALL_DIR="${INSTALL_DIR:-/root/glm-proxy}"
 UPSTREAM_API_KEY="${UPSTREAM_API_KEY:-}"
 CF_TUNNEL_TOKEN="${CF_TUNNEL_TOKEN:-}"
+PROXY_API_KEY="${PROXY_API_KEY:-}"  # 支持固定 API Key
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║      GLM API 中转代理服务 — 一键安装脚本 v2.1              ║"
+echo "║      GLM API 中转代理服务 — 一键安装脚本 v2.2              ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 
@@ -37,42 +30,43 @@ echo ""
 # ============================================================
 step "1/6 检查运行环境..."
 
-# 检查 Python
 if ! command -v python3 &>/dev/null; then
     error "未找到 python3，请先安装 Python 3.8+"
     exit 1
 fi
 PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-info "Python: $PY_VER"
+info "Python: $PY_VER, 架构: $(uname -m)"
 
-# 检查 pip
 if ! command -v pip3 &>/dev/null; then
     warn "未找到 pip3，正在安装..."
     python3 -m ensurepip --upgrade 2>/dev/null || apt-get update && apt-get install -y python3-pip
 fi
-info "pip3: $(pip3 --version 2>&1 | awk '{print $2}')"
-
-# 检查架构
-ARCH=$(uname -m)
-info "架构: $ARCH"
 
 info "环境检查通过 ✓"
 
 # ============================================================
-# STEP 2: 安装 Python 依赖
+# STEP 2: 安装 Python 依赖（跳过已安装的）
 # ============================================================
 step "2/6 安装 Python 依赖..."
 
-# 尝试使用清华镜像加速 pip
-PIP_INDEX="${PIP_INDEX:-https://pypi.tuna.tsinghua.edu.cn/simple}"
+NEED_INSTALL=0
+for pkg in fastapi httpx uvicorn; do
+    if ! python3 -c "import $pkg" 2>/dev/null; then
+        NEED_INSTALL=1
+        break
+    fi
+done
 
-pip3 install --upgrade pip -q -i "$PIP_INDEX" 2>/dev/null || true
-pip3 install fastapi httpx uvicorn -q -i "$PIP_INDEX" 2>/dev/null || {
-    warn "清华镜像失败，使用默认源..."
-    pip3 install fastapi httpx uvicorn -q
-}
-
-info "Python 依赖安装完成 ✓"
+if [ "$NEED_INSTALL" = "1" ]; then
+    PIP_INDEX="${PIP_INDEX:-https://pypi.tuna.tsinghua.edu.cn/simple}"
+    pip3 install fastapi httpx uvicorn -q -i "$PIP_INDEX" 2>/dev/null || {
+        warn "清华镜像失败，使用默认源..."
+        pip3 install fastapi httpx uvicorn -q
+    }
+    info "Python 依赖安装完成 ✓"
+else
+    info "Python 依赖已安装，跳过 ✓"
+fi
 
 # ============================================================
 # STEP 3: 部署代理脚本
@@ -86,7 +80,7 @@ if [ -f "$SCRIPT_DIR/glm_proxy.py" ]; then
     cp "$SCRIPT_DIR/glm_proxy.py" "$INSTALL_DIR/glm_proxy.py"
     info "代理脚本已复制到 $INSTALL_DIR"
 else
-    error "未找到 glm_proxy.py，请确保脚本在同一目录"
+    error "未找到 glm_proxy.py"
     exit 1
 fi
 
@@ -97,7 +91,7 @@ info "代理脚本部署完成 ✓"
 # ============================================================
 step "4/6 配置 API Key..."
 
-# 上游 API Key（从 hwcloud 提取或手动提供）
+# 上游 API Key
 if [ -n "$UPSTREAM_API_KEY" ]; then
     echo "$UPSTREAM_API_KEY" > /tmp/working_api_key.txt
     info "上游 API Key 已配置（环境变量）"
@@ -107,23 +101,22 @@ else
     echo ""
     warn "需要上游 API Key（从华为云 hwcloud 内部模型服务获取）"
     echo ""
-    echo "  提取方法："
-    echo "  1. 在华为云开发环境中运行 hwcloud chat"
-    echo "  2. 从 hwcloud 进程内存中提取 tokenhub API Key"
-    echo "  3. 或运行本目录下的 extract_key.sh 脚本"
+    echo "  提取方法：运行 bash scripts/extract_key.sh"
     echo ""
-    read -p "  请粘贴上游 API Key（或按 Enter 跳过手动配置）: " INPUT_KEY
+    read -p "  请粘贴上游 API Key（或按 Enter 跳过）: " INPUT_KEY
     if [ -n "$INPUT_KEY" ]; then
         echo "$INPUT_KEY" > /tmp/working_api_key.txt
         info "上游 API Key 已保存"
     else
-        warn "跳过上游 API Key 配置，代理启动时会报错"
-        warn "请稍后手动写入: echo 'YOUR_KEY' > /tmp/working_api_key.txt"
+        warn "跳过上游 API Key 配置"
     fi
 fi
 
-# 代理 API Key（自动生成）
-if [ -f /tmp/proxy_api_key.txt ]; then
+# 代理 API Key（支持固定或自动生成）
+if [ -n "$PROXY_API_KEY" ]; then
+    echo "$PROXY_API_KEY" > /tmp/proxy_api_key.txt
+    info "代理 API Key 已固定: ${PROXY_API_KEY:0:20}..."
+elif [ -f /tmp/proxy_api_key.txt ]; then
     info "代理 API Key 已存在: $(cat /tmp/proxy_api_key.txt | head -c 20)..."
 else
     PROXY_KEY="sk-glm-$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
@@ -148,7 +141,6 @@ if [ -f /tmp/glm_proxy.pid ]; then
     fi
 fi
 
-# 启动代理
 PROXY_PORT="$PROXY_PORT" nohup python3 "$INSTALL_DIR/glm_proxy.py" > /tmp/glm_proxy.log 2>&1 &
 echo $! > /tmp/glm_proxy.pid
 sleep 3
@@ -174,28 +166,26 @@ fi
 step "6/6 Cloudflare Tunnel 配置（可选）..."
 
 if [ -n "$CF_TUNNEL_TOKEN" ]; then
-    # 安装 cloudflared
     if ! command -v cloudflared &>/dev/null; then
         info "安装 cloudflared..."
+        ARCH=$(uname -m)
         if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
             CF_ARCH="arm64"
         else
             CF_ARCH="amd64"
         fi
-        
-        # 尝试直接下载，失败则用镜像
         wget -q "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}" -O /usr/local/bin/cloudflared 2>/dev/null || \
         wget -q "${GITHUB_MIRROR}/https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}" -O /usr/local/bin/cloudflared
         chmod +x /usr/local/bin/cloudflared
+    else
+        info "cloudflared 已安装，跳过"
     fi
     
-    # 停止已有隧道
     if [ -f /tmp/cloudflared.pid ]; then
         kill "$(cat /tmp/cloudflared.pid)" 2>/dev/null || true
         sleep 1
     fi
     
-    # 启动隧道
     echo "$CF_TUNNEL_TOKEN" > /tmp/cf_tunnel_token.txt
     nohup cloudflared tunnel run --token "$CF_TUNNEL_TOKEN" > /tmp/cloudflared.log 2>&1 &
     echo $! > /tmp/cloudflared.pid
@@ -223,7 +213,7 @@ echo "╔═══════════════════════�
 echo "║                    ✅ 安装完成！                             ║"
 echo "╠══════════════════════════════════════════════════════════════╣"
 echo "║                                                              ║"
-echo -e "║  代理地址:     http://localhost:${PROXY_PORT}/v1" 
+echo -e "║  代理地址:     http://localhost:${PROXY_PORT}/v1"
 echo -e "║  代理 API Key: $(cat /tmp/proxy_api_key.txt | head -c 40)..."
 echo "║  健康检查:     curl http://localhost:${PROXY_PORT}/health"
 echo "║  日志:         /tmp/glm_proxy.log"

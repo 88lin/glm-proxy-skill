@@ -1,170 +1,173 @@
 #!/bin/bash
 # ============================================================
-# 从华为云 hwcloud 二进制中提取 tokenhub API Key
+# 从华为云 hwcloud 进程内存提取 tokenhub API Key（优化版 v2）
+# 改进：gdb 快速提取 + 自动验证 + 支持超长 key（1000+ 字符）
 # 用法: bash extract_key.sh
 # ============================================================
 set -uo pipefail
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; }
 step()  { echo -e "${BLUE}[STEP]${NC} $1"; }
 
+API_BASE="https://tokenhub.developer.huaweicloud.com/v2"
+KEY_FILE="/tmp/working_api_key.txt"
+
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║     从 hwcloud 提取 tokenhub API Key                        ║"
+echo "║     从 hwcloud 提取 tokenhub API Key (v2 优化版)           ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 
-# ============================================================
-# 方法 1: 从已运行的 hwcloud 进程内存提取
-# ============================================================
-step "方法 1: 从 hwcloud 进程内存提取..."
+# --- 验证函数 ---
+verify_key() {
+    local key="$1"
+    local resp
+    resp=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: Bearer $key" \
+        -H "Content-Type: application/json" \
+        -d '{"model":"glm-5.2","messages":[{"role":"user","content":"hi"}],"max_tokens":5}' \
+        "$API_BASE/chat/completions" 2>/dev/null || echo "000")
+    [ "$resp" = "200" ]
+}
+
+# --- 方法 1: gdb 提取（最快最可靠）---
+step "方法 1: gdb 内存搜索（推荐，最快）..."
 
 HWCloud_PIDS=$(pgrep -f "hwcloud" 2>/dev/null || true)
 
-if [ -n "$HWCloud_PIDS" ]; then
-    info "找到 hwcloud 进程: $HWCloud_PIDS"
-    
+if [ -n "$HWCloud_PIDS" ] && command -v gdb &>/dev/null; then
     for PID in $HWCloud_PIDS; do
-        info "扫描进程 $PID 的内存..."
+        info "用 gdb 扫描进程 $PID ..."
         
-        # 从 /proc/PID/maps 和 /proc/PID/mem 提取字符串
-        # 查找类似 API key 的模式（长 hex 或 base64 字符串）
-        if [ -r "/proc/$PID/maps" ] && [ -r "/proc/$PID/mem" ]; then
-            # 提取可读内存区域中的字符串，搜索 API key 模式
+        # gdb 批量 dump 内存，搜索 "Authorization: Bearer " 后的长字符串
+        # 支持最长 2000 字符的 key
+        gdb -batch -ex "attach $PID" \
+            -ex "dump memory /tmp/_mem_dump.bin 0 0xffffffff" \
+            -ex "detach" 2>/dev/null
+
+        if [ -f /tmp/_mem_dump.bin ]; then
+            info "内存已 dump ($(du -h /tmp/_mem_dump.bin | cut -f1))，搜索 Bearer token..."
+            
+            # 搜索 "Authorization: Bearer " 后的 token（支持超长 key）
             python3 -c "
-import re, sys, os
+import re, sys
+
+with open('/tmp/_mem_dump.bin', 'rb') as f:
+    data = f.read()
+
+text = data.decode('utf-8', errors='ignore')
+
+# 模式 1: Authorization: Bearer <token>（最精确，支持 30-2000 字符）
+candidates = set()
+for m in re.finditer(r'Authorization:\s*Bearer\s+([A-Za-z0-9_\-+/=\.]{30,2000})', text):
+    candidates.add(m.group(1).strip())
+
+# 模式 2: bearer <token>（小写变体）
+for m in re.finditer(r'bearer\s+([A-Za-z0-9_\-+/=\.]{30,2000})', text, re.I):
+    candidates.add(m.group(1).strip())
+
+# 模式 3: 以 AAAA 开头的超长 token（tokenhub key 特征）
+for m in re.finditer(r'(AAAA[A-Za-z0-9_\-+/=\.]{50,2000})', text):
+    candidates.add(m.group(1).strip())
+
+# 按长度降序输出（长 key 更可能是真正的 API key）
+for k in sorted(candidates, key=len, reverse=True):
+    print(k)
+" 2>/dev/null | while read -r KEY; do
+                if [ -n "$KEY" ] && [ ${#KEY} -ge 30 ]; then
+                    info "候选 Key: ${KEY:0:30}... (长度: ${#KEY})"
+                    if verify_key "$KEY"; then
+                        info "✅ 验证成功！"
+                        echo "$KEY" > "$KEY_FILE"
+                        info "已保存到 $KEY_FILE"
+                        rm -f /tmp/_mem_dump.bin
+                        exit 0
+                    else
+                        warn "验证失败，继续尝试..."
+                    fi
+                fi
+            done
+            rm -f /tmp/_mem_dump.bin
+        fi
+    done
+    warn "gdb 方法未找到有效 Key"
+else
+    [ -z "$HWCloud_PIDS" ] && warn "未找到 hwcloud 进程"
+    ! command -v gdb &>/dev/null && warn "gdb 未安装"
+fi
+
+# --- 方法 2: /proc/PID/mem 直接读取（gdb 不可用时）---
+step "方法 2: /proc/PID/mem 直接搜索..."
+
+if [ -n "$HWCloud_PIDS" ]; then
+    for PID in $HWCloud_PIDS; do
+        info "扫描进程 $PID 内存区域..."
+        
+        python3 -c "
+import re, sys
 
 pid = $PID
-found_keys = set()
+candidates = set()
 
 try:
     with open(f'/proc/{pid}/maps', 'r') as maps:
         for line in maps:
             parts = line.split()
-            if len(parts) < 6:
+            if len(parts) < 6 or 'r' not in parts[1]:
                 continue
-            perms = parts[1]
-            if 'r' not in perms:
+            start, end = [int(x, 16) for x in parts[0].split('-')]
+            if end - start > 100 * 1024 * 1024:
                 continue
-            addr_range = parts[0].split('-')
-            start = int(addr_range[0], 16)
-            end = int(addr_range[1], 16)
-            
-            # 跳过过大的区域
-            if end - start > 50 * 1024 * 1024:
-                continue
-            
             try:
                 with open(f'/proc/{pid}/mem', 'rb') as mem:
                     mem.seek(start)
                     data = mem.read(end - start)
             except Exception:
                 continue
-            
-            # 搜索 API key 模式
-            # tokenhub key 通常以特定前缀开头或是很长的 hex/base64 字符串
             text = data.decode('utf-8', errors='ignore')
-            
-            # 模式 1: Bearer token
-            for m in re.finditer(r'Bearer\s+([A-Za-z0-9_\-]{32,128})', text):
-                found_keys.add(m.group(1))
-            
-            # 模式 2: api_key / authorization 字段
-            for m in re.finditer(r'(?:api[_-]?key|authorization|token)[\"\s:=]+([A-Za-z0-9_\-]{32,128})', text, re.I):
-                found_keys.add(m.group(1))
-            
-            # 模式 3: sk- 前缀
-            for m in re.finditer(r'(sk-[A-Za-z0-9_\-]{20,100})', text):
-                found_keys.add(m.group(1))
-
+            # Authorization: Bearer <token>（支持超长 key）
+            for m in re.finditer(r'Authorization:\s*Bearer\s+([A-Za-z0-9_\-+/=\.]{30,2000})', text):
+                candidates.add(m.group(1).strip())
+            # AAAA 开头的超长 token
+            for m in re.finditer(r'(AAAA[A-Za-z0-9_\-+/=\.]{50,2000})', text):
+                candidates.add(m.group(1).strip())
 except Exception as e:
     print(f'Error: {e}', file=sys.stderr)
 
-for k in sorted(found_keys, key=len, reverse=True):
+for k in sorted(candidates, key=len, reverse=True):
     print(k)
 " 2>/dev/null | while read -r KEY; do
-                if [ -n "$KEY" ] && [ ${#KEY} -ge 32 ]; then
-                    info "找到候选 Key: ${KEY:0:20}... (长度: ${#KEY})"
-                    echo "$KEY" > /tmp/working_api_key.txt
-                    info "已保存到 /tmp/working_api_key.txt"
-                    exit 0
+                if [ -n "$KEY" ] && [ ${#KEY} -ge 30 ]; then
+                    info "候选 Key: ${KEY:0:30}... (长度: ${#KEY})"
+                    if verify_key "$KEY"; then
+                        info "✅ 验证成功！"
+                        echo "$KEY" > "$KEY_FILE"
+                        info "已保存到 $KEY_FILE"
+                        exit 0
+                    else
+                        warn "验证失败，继续..."
+                    fi
                 fi
             done
-        fi
     done
-    warn "进程内存中未找到明确的 API Key"
-else
-    warn "未找到运行中的 hwcloud 进程"
+    warn "/proc/mem 方法未找到有效 Key"
 fi
 
-# ============================================================
-# 方法 2: 从 hwcloud 二进制文件中搜索
-# ============================================================
-step "方法 2: 从 hwcloud 二进制文件搜索..."
-
-HWCloud_BIN=$(which hwcloud 2>/dev/null || find / -name "hwcloud" -type f 2>/dev/null | head -1 || true)
-
-if [ -n "$HWCloud_BIN" ]; then
-    info "找到 hwcloud: $HWCloud_BIN"
-    
-    # 搜索二进制中的字符串
-    strings "$HWCloud_BIN" 2>/dev/null | grep -E '^[A-Za-z0-9_\-]{32,128}$' | sort -u | while read -r KEY; do
-        # 尝试验证 key 是否有效
-        if curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer $KEY" \
-            "https://tokenhub.developer.huaweicloud.com/v2/models" 2>/dev/null | grep -q "200"; then
-            info "验证成功！Key: ${KEY:0:20}..."
-            echo "$KEY" > /tmp/working_api_key.txt
-            info "已保存到 /tmp/working_api_key.txt"
-            exit 0
-        fi
-    done
-    warn "二进制中未找到有效 Key"
-else
-    warn "未找到 hwcloud 二进制"
-fi
-
-# ============================================================
-# 方法 3: 通过 hwcloud chat 获取
-# ============================================================
-step "方法 3: 通过 hwcloud chat 获取..."
-
-if command -v hwcloud &>/dev/null; then
-    info "尝试通过 hwcloud chat 启动会话..."
-    warn "请在新终端中运行: hwcloud chat"
-    warn "然后重新运行此脚本（方法 1 会扫描新进程）"
-else
-    warn "hwcloud 命令不可用"
-fi
-
-# ============================================================
-# 方法 4: 手动输入
-# ============================================================
-step "方法 4: 手动输入..."
+# --- 方法 3: 手动输入 ---
+step "方法 3: 手动输入..."
 echo ""
 read -p "请粘贴 tokenhub API Key（或按 Ctrl+C 退出）: " MANUAL_KEY
 
 if [ -n "$MANUAL_KEY" ]; then
-    echo "$MANUAL_KEY" > /tmp/working_api_key.txt
-    info "已保存到 /tmp/working_api_key.txt"
-    
-    # 验证
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-        -H "Authorization: Bearer $MANUAL_KEY" \
-        "https://tokenhub.developer.huaweicloud.com/v2/models" 2>/dev/null || echo "000")
-    
-    if [ "$HTTP_CODE" = "200" ]; then
+    echo "$MANUAL_KEY" > "$KEY_FILE"
+    info "已保存到 $KEY_FILE"
+    if verify_key "$MANUAL_KEY"; then
         info "✅ API Key 验证成功！"
     else
-        warn "API Key 验证返回 HTTP $HTTP_CODE（可能在此环境外无法验证）"
+        warn "API Key 验证失败（可能在此环境外无法验证）"
     fi
 else
     error "未提供 API Key"

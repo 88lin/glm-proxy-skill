@@ -25,7 +25,7 @@ from typing import Optional, AsyncIterator
 
 import httpx
 from fastapi import FastAPI, Request, HTTPException, Depends
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import uvicorn
 
@@ -787,13 +787,254 @@ async def embeddings(request: Request, _=Depends(verify_api_key)):
 # ============================================================
 @app.get("/")
 async def root():
-    return {
-        "service": "GLM API Proxy",
-        "version": "2.0.0",
-        "endpoints": ["/v1/chat/completions", "/v1/models", "/health"],
-        "models": [m["id"] for m in AVAILABLE_MODELS],
-        "thinking_levels": THINKING_LEVELS,
+    return HTMLResponse("""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GLM API 代理服务</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+.container{max-width:960px;margin:0 auto;padding:40px 20px}
+h1{font-size:2em;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.subtitle{color:#94a3b8;margin-bottom:32px;font-size:1.1em}
+.card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:24px;margin-bottom:20px}
+.card h2{color:#60a5fa;font-size:1.2em;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.badge{display:inline-block;background:#1e293b;border:1px solid #475569;border-radius:6px;padding:3px 10px;font-size:0.8em;margin:2px}
+.badge.green{border-color:#22c55e;color:#4ade80}
+.badge.blue{border-color:#3b82f6;color:#60a5fa}
+.badge.purple{border-color:#a855f7;color:#c084fc}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid #334155}
+th{color:#94a3b8;font-weight:600;font-size:0.85em;text-transform:uppercase;letter-spacing:0.5px}
+td code{background:#0f172a;padding:3px 8px;border-radius:4px;color:#7dd3fc;font-size:0.9em}
+.method{font-weight:bold;font-size:0.85em;padding:2px 8px;border-radius:4px}
+.method.get{background:#1a3a2a;color:#4ade80}
+.method.post{background:#3a2a1a;color:#fbbf24}
+code.block{display:block;background:#0f172a;padding:16px;border-radius:8px;overflow-x:auto;font-size:0.85em;line-height:1.6;color:#e2e8f0;font-family:'SF Mono',Monaco,Consolas,monospace;white-space:pre}
+.comment{color:#64748b}
+.key{color:#fbbf24}
+.str{color:#4ade80}
+.test-area{margin-top:8px}
+input,textarea,select{background:#0f172a;border:1px solid #475569;border-radius:8px;padding:10px 14px;color:#e2e8f0;font-size:0.9em;width:100%;outline:none}
+input:focus,textarea:focus,select:focus{border-color:#60a5fa}
+textarea{resize:vertical;min-height:100px;font-family:monospace}
+button{background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:white;border:none;border-radius:8px;padding:10px 24px;font-size:0.95em;cursor:pointer;transition:opacity .2s}
+button:hover{opacity:0.9}
+button:disabled{opacity:0.5;cursor:not-allowed}
+.result{margin-top:12px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:16px;min-height:60px;font-family:monospace;font-size:0.85em;white-space:pre-wrap;overflow-x:auto;max-height:400px;overflow-y:auto}
+.result.ok{border-color:#22c55e}
+.result.err{border-color:#ef4444}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
+label{display:block;color:#94a3b8;font-size:0.8em;margin-bottom:4px}
+a{color:#60a5fa;text-decoration:none}
+a:hover{text-decoration:underline}
+.footer{text-align:center;color:#475569;font-size:0.8em;margin-top:32px}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>GLM API 代理服务</h1>
+<p class="subtitle">OpenAI 兼容接口 · 支持 Thinking 模式 · 流式响应 · Cloudflare Tunnel 公网访问</p>
+
+<div class="card">
+<h2>📡 可用接口</h2>
+<table>
+<tr><th>方法</th><th>路径</th><th>说明</th></tr>
+<tr><td><span class="method get">GET</span></td><td><code>/v1/models</code></td><td>获取可用模型列表</td></tr>
+<tr><td><span class="method post">POST</span></td><td><code>/v1/chat/completions</code></td><td>对话补全（支持流式 & thinking）</td></tr>
+<tr><td><span class="method get">GET</span></td><td><code>/health</code></td><td>健康检查 + 运行时统计</td></tr>
+<tr><td><span class="method post">POST</span></td><td><code>/v1/embeddings</code></td><td>文本向量（如上游支持）</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h2>🤖 模型 & Thinking 等级</h2>
+<p style="margin-bottom:8px">
+<span class="badge blue">glm-5.2</span>
+<span class="badge blue">glm-5.1</span>
+<span class="badge blue">openPangu-2.0-Flash</span>
+</p>
+<p style="color:#94a3b8;font-size:0.9em">Thinking 模式（reasoning_effort 参数）：</p>
+<p>
+<span class="badge purple">xhigh</span>
+<span class="badge purple">max</span>
+<span class="badge purple">high</span>
+<span class="badge purple">medium</span>
+<span class="badge purple">low</span>
+</p>
+</div>
+
+<div class="card">
+<h2>📝 调用示例</h2>
+<p style="color:#94a3b8;margin-bottom:8px">cURL — 普通对话：</p>
+<code class="block">curl -X POST <span class="str">https://glm.zeroo.ggff.net/v1/chat/completions</span> \
+  -H <span class="str">"Authorization: Bearer YOUR_API_KEY"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"model":"glm-5.2","messages":[{"role":"user","content":"你好"}]}'</span></code>
+
+<p style="color:#94a3b8;margin:12px 0 8px">cURL — Thinking 模式：</p>
+<code class="block">curl -X POST <span class="str">https://glm.zeroo.ggff.net/v1/chat/completions</span> \
+  -H <span class="str">"Authorization: Bearer YOUR_API_KEY"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"model":"glm-5.2","messages":[{"role":"user","content":"证明根号2是无理数"}],"reasoning_effort":"xhigh"}'</span></code>
+
+<p style="color:#94a3b8;margin:12px 0 8px">Python (OpenAI SDK)：</p>
+<code class="block"><span class="key">from</span> openai <span class="key">import</span> OpenAI
+
+client = OpenAI(api_key=<span class="str">"YOUR_API_KEY"</span>, base_url=<span class="str">"https://glm.zeroo.ggff.net/v1"</span>)
+resp = client.chat.completions.create(
+    model=<span class="str">"glm-5.2"</span>,
+    messages=[{<span class="str">"role"</span>: <span class="str">"user"</span>, <span class="str">"content"</span>: <span class="str">"你好"</span>}],
+    extra_body={<span class="str">"reasoning_effort"</span>: <span class="str">"xhigh"</span>}
+)
+<span class="comment"># resp.choices[0].message.content — 回答</span>
+<span class="comment"># resp.choices[0].message.reasoning_content — 推理过程</span></code>
+</div>
+
+<div class="card">
+<h2>🧪 在线测试</h2>
+<div class="grid">
+<div>
+<label>API Key</label>
+<input type="password" id="apiKey" placeholder="sk-xxx" value="">
+</div>
+<div>
+<label>模型</label>
+<select id="model">
+<option value="glm-5.2">glm-5.2</option>
+<option value="glm-5.1">glm-5.1</option>
+<option value="openPangu-2.0-Flash">openPangu-2.0-Flash</option>
+</select>
+</div>
+</div>
+<div style="margin-top:12px">
+<label>Thinking 模式</label>
+<select id="thinking">
+<option value="">关闭</option>
+<option value="low">low</option>
+<option value="medium">medium</option>
+<option value="high">high</option>
+<option value="max">max</option>
+<option value="xhigh">xhigh（最深推理）</option>
+</select>
+</div>
+<div style="margin-top:12px">
+<label>消息内容</label>
+<textarea id="message">你好，请简单介绍一下自己</textarea>
+</div>
+<div style="margin-top:12px;display:flex;gap:12px;align-items:center">
+<button id="sendBtn" onclick="sendRequest()">发送请求</button>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+<input type="checkbox" id="stream" style="width:auto"> 流式响应
+</label>
+</div>
+<div id="result" class="result">等待发送...</div>
+</div>
+
+<div class="card">
+<h2>⚙️ 在客户端中使用</h2>
+<table>
+<tr><th>客户端</th><th>API 地址</th><th>API Key</th></tr>
+<tr><td>ChatGPT-Next-Web</td><td><code>https://glm.zeroo.ggff.net</code></td><td>代理 API Key</td></tr>
+<tr><td>LobeChat</td><td><code>https://glm.zeroo.ggff.net/v1</code></td><td>代理 API Key</td></tr>
+<tr><td>OpenAI SDK</td><td><code>https://glm.zeroo.ggff.net/v1</code></td><td>代理 API Key</td></tr>
+</table>
+</div>
+
+<div class="footer">
+GLM API Proxy v2.1 · FastAPI + httpx · Cloudflare Tunnel<br>
+<a href="/health">健康检查</a> · <a href="/v1/models">模型列表</a>
+</div>
+</div>
+
+<script>
+async function sendRequest() {
+    const btn = document.getElementById('sendBtn');
+    const result = document.getElementById('result');
+    const key = document.getElementById('apiKey').value;
+    const model = document.getElementById('model').value;
+    const thinking = document.getElementById('thinking').value;
+    const msg = document.getElementById('message').value;
+    const stream = document.getElementById('stream').checked;
+
+    if (!key) { result.className='result err'; result.textContent='请输入 API Key'; return; }
+
+    btn.disabled = true;
+    result.className = 'result';
+    result.textContent = '请求中...';
+
+    const body = {model, messages:[{role:'user',content:msg}]};
+    if (thinking) body.reasoning_effort = thinking;
+    if (stream) body.stream = true;
+
+    try {
+        const resp = await fetch('/v1/chat/completions', {
+            method:'POST',
+            headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
+            body:JSON.stringify(body)
+        });
+
+        if (!resp.ok) {
+            const err = await resp.text();
+            result.className='result err';
+            result.textContent='HTTP '+resp.status+'
+'+err;
+            return;
+        }
+
+        if (stream) {
+            result.className='result ok';
+            result.textContent='';
+            const reader = resp.body.getReader();
+            const dec = new TextDecoder();
+            let buf='';
+            while(true){
+                const{done,value}=await reader.read();
+                if(done)break;
+                buf+=dec.decode(value,{stream:true});
+                const lines=buf.split('
+');
+                buf=lines.pop();
+                for(const line of lines){
+                    if(line.startsWith('data: ')&&line!=='data: [DONE]'){
+                        try{
+                            const d=JSON.parse(line.slice(6));
+                            const c=d.choices?.[0]?.delta;
+                            if(c?.reasoning_content)result.textContent+='[思考]'+c.reasoning_content;
+                            if(c?.content)result.textContent+=c.content;
+                            result.scrollTop=result.scrollHeight;
+                        }catch(e){}
+                    }
+                }
+            }
+        } else {
+            const data = await resp.json();
+            result.className='result ok';
+            const c = data.choices?.[0]?.message;
+            result.textContent = '';
+            if(c?.reasoning_content) result.textContent+='[推理过程]
+'+c.reasoning_content+'
+
+';
+            if(c?.content) result.textContent+='[回答]
+'+c.content;
+            if(data.usage) result.textContent+='
+
+[Usage] '+JSON.stringify(data.usage);
+        }
+    } catch(e) {
+        result.className='result err';
+        result.textContent='错误: '+e.message;
+    } finally {
+        btn.disabled=false;
     }
+}
+</script>
+</body>
+</html>""")
 
 
 # ============================================================

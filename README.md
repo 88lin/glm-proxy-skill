@@ -237,3 +237,11 @@ glm-proxy-skill/
 3. **Cloudflare 免费版有 100s 边缘超时** — 代理已通过空白保活解决此问题
 4. **代理端口需与 Tunnel Ingress 一致** — 默认 9997
 5. **GitHub 镜像 `ghfast.top`** — 用于在中国加速下载 cloudflared
+
+## 🔗 下一步：设置自动备份
+
+GLM 代理搭好后，建议立即设置自动备份，这样容器销毁重建后可以一键恢复：
+
+→ **[devenv-chat-backup-skill](https://github.com/88lin/devenv-chat-backup-skill)** — 聊天历史 + GLM Proxy + 配置自动备份到 GitHub
+
+设置完成后，以后容器销毁重建只需一条命令恢复全部（代理 + Key + 聊天历史 + 保活）。

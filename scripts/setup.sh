@@ -93,10 +93,10 @@ step "4/6 配置 API Key..."
 
 # 上游 API Key
 if [ -n "$UPSTREAM_API_KEY" ]; then
-    echo "$UPSTREAM_API_KEY" > /tmp/working_api_key.txt
+    echo "$UPSTREAM_API_KEY" > /root/working_api_key.txt
     info "上游 API Key 已配置（环境变量）"
-elif [ -f /tmp/working_api_key.txt ]; then
-    info "上游 API Key 已存在（/tmp/working_api_key.txt）"
+elif [ -f /root/working_api_key.txt ]; then
+    info "上游 API Key 已存在（/root/working_api_key.txt）"
 else
     echo ""
     warn "需要上游 API Key（从华为云 hwcloud 内部模型服务获取）"
@@ -105,7 +105,7 @@ else
     echo ""
     read -p "  请粘贴上游 API Key（或按 Enter 跳过）: " INPUT_KEY
     if [ -n "$INPUT_KEY" ]; then
-        echo "$INPUT_KEY" > /tmp/working_api_key.txt
+        echo "$INPUT_KEY" > /root/working_api_key.txt
         info "上游 API Key 已保存"
     else
         warn "跳过上游 API Key 配置"
@@ -114,13 +114,13 @@ fi
 
 # 代理 API Key（支持固定或自动生成）
 if [ -n "$PROXY_API_KEY" ]; then
-    echo "$PROXY_API_KEY" > /tmp/proxy_api_key.txt
+    echo "$PROXY_API_KEY" > /root/proxy_api_key.txt
     info "代理 API Key 已固定: ${PROXY_API_KEY:0:20}..."
-elif [ -f /tmp/proxy_api_key.txt ]; then
-    info "代理 API Key 已存在: $(cat /tmp/proxy_api_key.txt | head -c 20)..."
+elif [ -f /root/proxy_api_key.txt ]; then
+    info "代理 API Key 已存在: $(cat /root/proxy_api_key.txt | head -c 20)..."
 else
     PROXY_KEY="sk-glm-$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
-    echo "$PROXY_KEY" > /tmp/proxy_api_key.txt
+    echo "$PROXY_KEY" > /root/proxy_api_key.txt
     info "代理 API Key 已生成: ${PROXY_KEY:0:20}..."
 fi
 
@@ -132,8 +132,8 @@ info "API Key 配置完成 ✓"
 step "5/6 启动代理服务..."
 
 # 停止已有实例
-if [ -f /tmp/glm_proxy.pid ]; then
-    OLD_PID=$(cat /tmp/glm_proxy.pid)
+if [ -f /root/glm_proxy.pid ]; then
+    OLD_PID=$(cat /root/glm_proxy.pid)
     if kill -0 "$OLD_PID" 2>/dev/null; then
         kill "$OLD_PID" 2>/dev/null
         sleep 2
@@ -141,15 +141,15 @@ if [ -f /tmp/glm_proxy.pid ]; then
     fi
 fi
 
-PROXY_PORT="$PROXY_PORT" nohup python3 "$INSTALL_DIR/glm_proxy.py" > /tmp/glm_proxy.log 2>&1 &
-echo $! > /tmp/glm_proxy.pid
+PROXY_PORT="$PROXY_PORT" nohup python3 "$INSTALL_DIR/glm_proxy.py" > /root/glm_proxy.log 2>&1 &
+echo $! > /root/glm_proxy.pid
 sleep 3
 
-if kill -0 "$(cat /tmp/glm_proxy.pid)" 2>/dev/null; then
-    info "代理服务已启动 (PID: $(cat /tmp/glm_proxy.pid), 端口: $PROXY_PORT)"
+if kill -0 "$(cat /root/glm_proxy.pid)" 2>/dev/null; then
+    info "代理服务已启动 (PID: $(cat /root/glm_proxy.pid), 端口: $PROXY_PORT)"
 else
     error "代理服务启动失败，查看日志："
-    tail -20 /tmp/glm_proxy.log
+    tail -20 /root/glm_proxy.log
     exit 1
 fi
 
@@ -181,20 +181,20 @@ if [ -n "$CF_TUNNEL_TOKEN" ]; then
         info "cloudflared 已安装，跳过"
     fi
     
-    if [ -f /tmp/cloudflared.pid ]; then
-        kill "$(cat /tmp/cloudflared.pid)" 2>/dev/null || true
+    if [ -f /root/cloudflared.pid ]; then
+        kill "$(cat /root/cloudflared.pid)" 2>/dev/null || true
         sleep 1
     fi
     
-    echo "$CF_TUNNEL_TOKEN" > /tmp/cf_tunnel_token.txt
-    nohup cloudflared tunnel run --token "$CF_TUNNEL_TOKEN" > /tmp/cloudflared.log 2>&1 &
-    echo $! > /tmp/cloudflared.pid
+    echo "$CF_TUNNEL_TOKEN" > /root/cf_tunnel_token.txt
+    nohup cloudflared tunnel run --token "$CF_TUNNEL_TOKEN" > /root/cloudflared.log 2>&1 &
+    echo $! > /root/cloudflared.pid
     sleep 3
     
-    if kill -0 "$(cat /tmp/cloudflared.pid)" 2>/dev/null; then
-        info "Cloudflare Tunnel 已启动 (PID: $(cat /tmp/cloudflared.pid))"
+    if kill -0 "$(cat /root/cloudflared.pid)" 2>/dev/null; then
+        info "Cloudflare Tunnel 已启动 (PID: $(cat /root/cloudflared.pid))"
     else
-        warn "Cloudflare Tunnel 启动失败，查看 /tmp/cloudflared.log"
+        warn "Cloudflare Tunnel 启动失败，查看 /root/cloudflared.log"
     fi
 else
     warn "未提供 CF_TUNNEL_TOKEN，跳过隧道配置"
@@ -214,13 +214,13 @@ echo "║                    ✅ 安装完成！                             ║
 echo "╠══════════════════════════════════════════════════════════════╣"
 echo "║                                                              ║"
 echo -e "║  代理地址:     http://localhost:${PROXY_PORT}/v1"
-echo -e "║  代理 API Key: $(cat /tmp/proxy_api_key.txt | head -c 40)..."
+echo -e "║  代理 API Key: $(cat /root/proxy_api_key.txt | head -c 40)..."
 echo "║  健康检查:     curl http://localhost:${PROXY_PORT}/health"
-echo "║  日志:         /tmp/glm_proxy.log"
+echo "║  日志:         /root/glm_proxy.log"
 echo "║                                                              ║"
 echo "║  使用示例:                                                   ║"
 echo "║  curl -X POST http://localhost:${PROXY_PORT}/v1/chat/completions \\"
-echo "║    -H 'Authorization: Bearer \$(cat /tmp/proxy_api_key.txt)' \\"
+echo "║    -H 'Authorization: Bearer \$(cat /root/proxy_api_key.txt)' \\"
 echo "║    -H 'Content-Type: application/json' \\"
 echo "║    -d '{\"model\":\"glm-5.2\",\"messages\":[{\"role\":\"user\",\"content\":\"你好\"}]}'"
 echo "║                                                              ║"

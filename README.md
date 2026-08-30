@@ -9,7 +9,7 @@
 ```
 请帮我搭建 GLM API 中转代理服务：
 
-1. 从 hwcloud 进程内存提取 tokenhub API Key，保存到 /tmp/working_api_key.txt
+1. 从 hwcloud 进程内存提取 tokenhub API Key，保存到 /root/working_api_key.txt
 2. 运行 bash scripts/setup.sh 安装代理服务（端口 9997）
 3. 配置 Cloudflare Tunnel：
    - Tunnel Token: eyJxxx（替换为你的 token）
@@ -59,7 +59,7 @@ with open(f'/proc/{pid}/maps') as f:
 
 将找到的 Key 保存：
 ```bash
-echo '你的KEY' > /tmp/working_api_key.txt
+echo '你的KEY' > /root/working_api_key.txt
 ```
 
 ### 2. 安装并启动代理
@@ -72,7 +72,7 @@ bash scripts/setup.sh
 UPSTREAM_API_KEY="你的KEY" PROXY_PORT=9997 bash scripts/setup.sh
 ```
 
-安装完成后，代理 API Key 在 `/tmp/proxy_api_key.txt`。
+安装完成后，代理 API Key 在 `/root/proxy_api_key.txt`。
 
 ### 3. 配置 Cloudflare Tunnel
 
@@ -91,8 +91,8 @@ wget "https://ghfast.top/https://github.com/cloudflare/cloudflared/releases/late
 chmod +x /usr/local/bin/cloudflared
 
 # 启动隧道
-nohup cloudflared tunnel run --token "eyJxxx你的token" > /tmp/cloudflared.log 2>&1 &
-echo $! > /tmp/cloudflared.pid
+nohup cloudflared tunnel run --token "eyJxxx你的token" > /root/cloudflared.log 2>&1 &
+echo $! > /root/cloudflared.pid
 ```
 
 ### 4. 验证
@@ -102,13 +102,13 @@ echo $! > /tmp/cloudflared.pid
 curl http://localhost:9997/health
 
 curl -X POST http://localhost:9997/v1/chat/completions \
-  -H "Authorization: Bearer $(cat /tmp/proxy_api_key.txt)" \
+  -H "Authorization: Bearer $(cat /root/proxy_api_key.txt)" \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"你好"}]}'
 
 # 公网验证（替换域名）
 curl -X POST https://glm.zeroo.ggff.net/v1/chat/completions \
-  -H "Authorization: Bearer $(cat /tmp/proxy_api_key.txt)" \
+  -H "Authorization: Bearer $(cat /root/proxy_api_key.txt)" \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"你好"}]}'
 ```
@@ -121,7 +121,7 @@ curl -X POST https://glm.zeroo.ggff.net/v1/chat/completions \
 from openai import OpenAI
 
 client = OpenAI(
-    api_key="你的代理API_KEY",       # /tmp/proxy_api_key.txt 的内容
+    api_key="你的代理API_KEY",       # /root/proxy_api_key.txt 的内容
     base_url="https://glm.zeroo.ggff.net/v1"
 )
 
@@ -179,7 +179,7 @@ curl -X POST https://glm.zeroo.ggff.net/v1/chat/completions \
 | 设置项 | 值 |
 |--------|-----|
 | API 地址 | `https://glm.zeroo.ggff.net` |
-| API Key | `/tmp/proxy_api_key.txt` 的内容 |
+| API Key | `/root/proxy_api_key.txt` 的内容 |
 | 模型 | `glm-5.2` 或 `glm-5.1` |
 
 ## 🔧 服务管理
@@ -189,17 +189,17 @@ curl -X POST https://glm.zeroo.ggff.net/v1/chat/completions \
 curl http://localhost:9997/health | python3 -m json.tool
 
 # 查看日志
-tail -f /tmp/glm_proxy.log
+tail -f /root/glm_proxy.log
 
 # 重启代理
-kill $(cat /tmp/glm_proxy.pid); sleep 1
-PROXY_PORT=9997 nohup python3 /root/glm-proxy/glm_proxy.py > /tmp/glm_proxy.log 2>&1 &
-echo $! > /tmp/glm_proxy.pid
+kill $(cat /root/glm_proxy.pid); sleep 1
+PROXY_PORT=9997 nohup python3 /root/glm-proxy/glm_proxy.py > /root/glm_proxy.log 2>&1 &
+echo $! > /root/glm_proxy.pid
 
 # 重启隧道
-kill $(cat /tmp/cloudflared.pid); sleep 1
-nohup cloudflared tunnel run --token "$(cat /tmp/cf_tunnel_token.txt)" > /tmp/cloudflared.log 2>&1 &
-echo $! > /tmp/cloudflared.pid
+kill $(cat /root/cloudflared.pid); sleep 1
+nohup cloudflared tunnel run --token "$(cat /root/cf_tunnel_token.txt)" > /root/cloudflared.log 2>&1 &
+echo $! > /root/cloudflared.pid
 ```
 
 ## 🌟 功能特性

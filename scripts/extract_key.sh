@@ -13,7 +13,7 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; }
 step()  { echo -e "${BLUE}[STEP]${NC} $1"; }
 
 API_BASE="https://tokenhub.developer.huaweicloud.com/v2"
-KEY_FILE="/tmp/working_api_key.txt"
+KEY_FILE="/root/working_api_key.txt"
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"
@@ -45,17 +45,17 @@ if [ -n "$HWCloud_PIDS" ] && command -v gdb &>/dev/null; then
         # gdb 批量 dump 内存，搜索 "Authorization: Bearer " 后的长字符串
         # 支持最长 2000 字符的 key
         gdb -batch -ex "attach $PID" \
-            -ex "dump memory /tmp/_mem_dump.bin 0 0xffffffff" \
+            -ex "dump memory /root/_mem_dump.bin 0 0xffffffff" \
             -ex "detach" 2>/dev/null
 
-        if [ -f /tmp/_mem_dump.bin ]; then
-            info "内存已 dump ($(du -h /tmp/_mem_dump.bin | cut -f1))，搜索 Bearer token..."
+        if [ -f /root/_mem_dump.bin ]; then
+            info "内存已 dump ($(du -h /root/_mem_dump.bin | cut -f1))，搜索 Bearer token..."
             
             # 搜索 "Authorization: Bearer " 后的 token（支持超长 key）
             python3 -c "
 import re, sys
 
-with open('/tmp/_mem_dump.bin', 'rb') as f:
+with open('/root/_mem_dump.bin', 'rb') as f:
     data = f.read()
 
 text = data.decode('utf-8', errors='ignore')
@@ -83,14 +83,14 @@ for k in sorted(candidates, key=len, reverse=True):
                         info "✅ 验证成功！"
                         echo "$KEY" > "$KEY_FILE"
                         info "已保存到 $KEY_FILE"
-                        rm -f /tmp/_mem_dump.bin
+                        rm -f /root/_mem_dump.bin
                         exit 0
                     else
                         warn "验证失败，继续尝试..."
                     fi
                 fi
             done
-            rm -f /tmp/_mem_dump.bin
+            rm -f /root/_mem_dump.bin
         fi
     done
     warn "gdb 方法未找到有效 Key"

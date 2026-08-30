@@ -33,12 +33,12 @@ import uvicorn
 # 配置
 # ============================================================
 UPSTREAM_BASE = "https://tokenhub.developer.huaweicloud.com/v2"
-API_KEY_FILE = os.environ.get("API_KEY_FILE", "/tmp/working_api_key.txt")
+API_KEY_FILE = os.environ.get("API_KEY_FILE", "/root/working_api_key.txt")
 PROXY_HOST = os.environ.get("PROXY_HOST", "0.0.0.0")
 PROXY_PORT = int(os.environ.get("PROXY_PORT", "9997"))
 
 # 代理自身的 API Key 认证
-PROXY_API_KEY_FILE = os.environ.get("PROXY_API_KEY_FILE", "/tmp/proxy_api_key.txt")
+PROXY_API_KEY_FILE = os.environ.get("PROXY_API_KEY_FILE", "/root/proxy_api_key.txt")
 PROXY_API_KEY = os.environ.get("PROXY_API_KEY", "")
 
 # --- 连接池配置 ---

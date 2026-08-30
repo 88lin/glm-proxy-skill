@@ -34,7 +34,7 @@ import uvicorn
 # ============================================================
 UPSTREAM_BASE = "https://tokenhub.developer.huaweicloud.com/v2"
 API_KEY_FILE = os.environ.get("API_KEY_FILE", "/root/working_api_key.txt")
-PROXY_HOST = os.environ.get("PROXY_HOST", "0.0.0.0")
+PROXY_HOST = os.environ.get("PROXY_HOST", "::")
 PROXY_PORT = int(os.environ.get("PROXY_PORT", "9997"))
 
 # 代理自身的 API Key 认证

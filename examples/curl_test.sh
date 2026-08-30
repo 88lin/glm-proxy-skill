@@ -4,7 +4,7 @@
 # 示例: bash curl_test.sh glm.zeroo.ggff.net
 
 BASE_URL="${1:-http://localhost:9997}"
-API_KEY=$(cat /tmp/proxy_api_key.txt 2>/dev/null || echo "YOUR_API_KEY")
+API_KEY=$(cat /root/proxy_api_key.txt 2>/dev/null || echo "YOUR_API_KEY")
 
 echo "测试地址: $BASE_URL"
 echo "API Key: ${API_KEY:0:20}..."

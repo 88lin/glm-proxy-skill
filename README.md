@@ -1,6 +1,6 @@
 # GLM API 中转代理服务
 
-> 将华为云内部 GLM 模型（GLM-5.2 / GLM-5.1）通过 OpenAI 兼容 API 代理到公网，支持 thinking 模式、流式响应、Cloudflare Tunnel 穿透。
+> 将华为云内部 GLM 模型（GLM-5.2 / GLM-5.1 / DeepSeek-V4（deepseek-v4-flash-0731、deepseek-v4-pro-0813））通过 OpenAI 兼容 API 代理到公网，支持 thinking 模式、流式响应、Cloudflare Tunnel 穿透。
 
 ## 🚀 快速开始（复制粘贴给 AI）
 
@@ -180,7 +180,7 @@ curl -X POST https://glm.zeroo.ggff.net/v1/chat/completions \
 |--------|-----|
 | API 地址 | `https://glm.zeroo.ggff.net` |
 | API Key | `/root/proxy_api_key.txt` 的内容 |
-| 模型 | `glm-5.2` 或 `glm-5.1` |
+| 模型 | `glm-5.2`、`glm-5.1`、`deepseek-v4-flash-0731`、`deepseek-v4-pro-0813` |
 
 ## 🔧 服务管理
 

@@ -90,6 +90,20 @@ AVAILABLE_MODELS = [
         "owned_by": "zhipu",
         "description": "GLM-5.1 - 稳定版本，支持 thinking 模式"
     },
+    {
+        "id": "deepseek-v4-flash-0731",
+        "object": "model",
+        "created": 1700000000,
+        "owned_by": "deepseek",
+        "description": "DeepSeek-V4-Flash-0731 - 高速推理模型，兼顾速度与质量"
+    },
+    {
+        "id": "deepseek-v4-pro-0813",
+        "object": "model",
+        "created": 1700000000,
+        "owned_by": "deepseek",
+        "description": "DeepSeek-V4-Pro-0813 - 旗舰推理模型，最强能力"
+    },
 ]
 
 THINKING_LEVELS = ["xhigh", "max", "high", "medium", "low"]
@@ -855,6 +869,8 @@ a:hover{text-decoration:underline}
 <p style="margin-bottom:8px">
 <span class="badge blue">glm-5.2</span>
 <span class="badge blue">glm-5.1</span>
+<span class="badge blue">deepseek-v4-flash-0731</span>
+<span class="badge blue">deepseek-v4-pro-0813</span>
 <span class="badge blue">openPangu-2.0-Flash</span>
 </p>
 <p style="color:#94a3b8;font-size:0.9em">Thinking 模式（reasoning_effort 参数）：</p>
@@ -906,6 +922,8 @@ resp = client.chat.completions.create(
 <select id="model">
 <option value="glm-5.2">glm-5.2</option>
 <option value="glm-5.1">glm-5.1</option>
+<option value="deepseek-v4-flash-0731">deepseek-v4-flash-0731</option>
+<option value="deepseek-v4-pro-0813">deepseek-v4-pro-0813</option>
 <option value="openPangu-2.0-Flash">openPangu-2.0-Flash</option>
 </select>
 </div>
@@ -1047,7 +1065,7 @@ if __name__ == "__main__":
 ╠══════════════════════════════════════════════════════════════╣
 ║ 监听地址: {PROXY_HOST}:{PROXY_PORT:<51}║
 ║ 上游 API: {UPSTREAM_BASE:<52}║
-║ 模型列表: glm-5.2, glm-5.1                                    ║
+║ 模型列表: glm-5.2, glm-5.1, deepseek-v4-flash-0731, deepseek-v4-pro-0813                                    ║
 ║ Thinking: reasoning_effort (xhigh/max/high/medium/low)        ║
 ║ 自适应超时: xhigh/max=600s, high=300s, medium=180s, low=120s  ║
 ║ 心跳保活: 每{HEARTBEAT_INTERVAL:>4.0f}秒发送 SSE 注释行                       ║

@@ -2,7 +2,7 @@
 
 ## 概述
 
-在华为云开发环境中，将内部 GLM 模型服务（GLM-5.2/GLM-5.1）通过 OpenAI 兼容 API 代理到公网，供外部电脑使用。支持 thinking 模式、流式/非流式响应、Cloudflare Tunnel 内网穿透、API Key 认证。
+在华为云开发环境中，将内部 GLM / DeepSeek 模型服务（GLM-5.2、GLM-5.1、deepseek-v4-flash-0731、deepseek-v4-pro-0813）通过 OpenAI 兼容 API 代理到公网，供外部电脑使用。支持 thinking 模式、流式/非流式响应、Cloudflare Tunnel 内网穿透、API Key 认证。
 
 ## 触发词
 
@@ -148,6 +148,12 @@ curl -X POST https://glm.zeroo.ggff.net/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"glm-5.2","messages":[{"role":"user","content":"你好"}]}'
 ```
+
+
+> **模型说明**：可用模型取决于上游 tokenhub Key 的权限。当前代理内置
+> `glm-5.2`、`glm-5.1`、`deepseek-v4-flash-0731`、`deepseek-v4-pro-0813` 四个模型。
+> 每个环境的 key 权限可能不同，可通过 `GET /v1/models` 查看当前实际可用的模型。
+> 新模型权限开通后，在 `glm_proxy.py` 的 `AVAILABLE_MODELS` 中追加即可。
 
 ### 第五步：从外部电脑使用
 
